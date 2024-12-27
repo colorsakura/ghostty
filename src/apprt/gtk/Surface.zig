@@ -1577,6 +1577,7 @@ fn gtkKeyPressed(
     gtk_mods: c.GdkModifierType,
     ud: ?*anyopaque,
 ) callconv(.C) c.gboolean {
+    log.debug("keypress", .{});
     const self = userdataSelf(ud.?);
     return if (self.keyEvent(
         .press,
@@ -1594,6 +1595,7 @@ fn gtkKeyReleased(
     state: c.GdkModifierType,
     ud: ?*anyopaque,
 ) callconv(.C) c.gboolean {
+    log.debug("keyrelease", .{});
     const self = userdataSelf(ud.?);
     return if (self.keyEvent(
         .release,
@@ -1834,7 +1836,7 @@ fn gtkInputPreeditStart(
     _: *c.GtkIMContext,
     ud: ?*anyopaque,
 ) callconv(.C) void {
-    //log.debug("preedit start", .{});
+    log.debug("preedit start", .{});
     const self = userdataSelf(ud.?);
     if (!self.in_keypress) return;
 
@@ -1848,10 +1850,12 @@ fn gtkInputPreeditChanged(
     ctx: *c.GtkIMContext,
     ud: ?*anyopaque,
 ) callconv(.C) void {
+    log.debug("preedit changed", .{});
     const self = userdataSelf(ud.?);
 
     // If there's buffered character, send the characters directly to the surface.
     if (self.im_composing and self.im_commit_buffered) {
+        log.debug("im commit: {s}", .{self.im_buf[0..self.im_len]});
         defer self.im_commit_buffered = false;
         defer self.im_len = 0;
         _ = self.core_surface.keyCallback(.{
@@ -1868,11 +1872,12 @@ fn gtkInputPreeditChanged(
         };
     }
 
-    if (!self.in_keypress) return;
+    // if (!self.in_keypress) return;
 
     // Get our pre-edit string that we'll use to show the user.
     var buf: [*c]u8 = undefined;
     _ = c.gtk_im_context_get_preedit_string(ctx, &buf, null, null);
+    // log.debug("get preedit text: {s}", .{buf});
     defer c.g_free(buf);
     const str = std.mem.sliceTo(buf, 0);
 
@@ -1880,12 +1885,18 @@ fn gtkInputPreeditChanged(
     // a commit event when the preedit is being cleared and we don't want
     // to set im_len to zero. This is safe because preeditstart always sets
     // im_len to zero.
-    if (str.len == 0) return;
+    // if (str.len == 0) return;
 
     // Copy the preedit string into the im_buf. This is safe because
     // commit will always overwrite this.
     self.im_len = @intCast(@min(self.im_buf.len, str.len));
     @memcpy(self.im_buf[0..self.im_len], str);
+    // log.debug("im_buf: {s}", .{self.im_buf[0..self.im_len]});
+
+    _ = self.core_surface.preeditCallback(self.im_buf[0..self.im_len]) catch |err| {
+        log.err("error in key callback err={}", .{err});
+        return;
+    };
 }
 
 fn gtkInputPreeditEnd(
@@ -1905,6 +1916,8 @@ fn gtkInputCommit(
 ) callconv(.C) void {
     const self = userdataSelf(ud.?);
     const str = std.mem.sliceTo(bytes, 0);
+
+    self.im_len = 0;
 
     // If we're in a key event, then we want to buffer the commit so
     // that we can send the proper keycallback followed by the char
