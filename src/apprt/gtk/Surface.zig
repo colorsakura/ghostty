@@ -1893,8 +1893,8 @@ fn gtkInputPreeditChanged(
     @memcpy(self.im_buf[0..self.im_len], str);
     // log.debug("im_buf: {s}", .{self.im_buf[0..self.im_len]});
 
-    _ = self.core_surface.preeditCallback(self.im_buf[0..self.im_len]) catch |err| {
-        log.err("error in key callback err={}", .{err});
+    _ = self.core_surface.preeditCallback(str) catch |err| {
+        log.err("error in preedit callback err={}", .{err});
         return;
     };
 }
@@ -1903,8 +1903,19 @@ fn gtkInputPreeditEnd(
     _: *c.GtkIMContext,
     ud: ?*anyopaque,
 ) callconv(.C) void {
-    //log.debug("preedit end", .{});
+    log.debug("preedit end", .{});
     const self = userdataSelf(ud.?);
+
+    // 在预编辑结束后应该更新cursor位置
+    const ime_point = self.core_surface.imePoint();
+    log.debug("ime point: x{} y{}", .{ ime_point.x, ime_point.y });
+    c.gtk_im_context_set_cursor_location(self.im_context, &.{
+        .x = @intFromFloat(ime_point.x),
+        .y = @intFromFloat(ime_point.y),
+        .width = 1,
+        .height = 1,
+    });
+
     if (!self.in_keypress) return;
     self.im_composing = false;
 }
@@ -1914,6 +1925,7 @@ fn gtkInputCommit(
     bytes: [*:0]u8,
     ud: ?*anyopaque,
 ) callconv(.C) void {
+    log.debug("input commit", .{});
     const self = userdataSelf(ud.?);
     const str = std.mem.sliceTo(bytes, 0);
 
@@ -1960,6 +1972,21 @@ fn gtkInputCommit(
         log.err("error in key callback err={}", .{err});
         return;
     };
+
+    // 提交输入内容后，需要清除 preedit text
+    _ = self.core_surface.preeditCallback("") catch |err| {
+        log.err("error in preedit callback err={}", .{err});
+        return;
+    };
+
+    const ime_point = self.core_surface.imePoint();
+    log.debug("ime point: x{} y{}", .{ ime_point.x, ime_point.y });
+    c.gtk_im_context_set_cursor_location(self.im_context, &.{
+        .x = @intFromFloat(ime_point.x),
+        .y = @intFromFloat(ime_point.y),
+        .width = 1,
+        .height = 1,
+    });
 }
 
 fn gtkFocusEnter(_: *c.GtkEventControllerFocus, ud: ?*anyopaque) callconv(.C) void {
