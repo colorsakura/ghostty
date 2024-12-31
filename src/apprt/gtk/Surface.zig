@@ -1657,7 +1657,7 @@ pub fn keyEvent(
     defer self.im_len = 0;
 
     // We only want to send the event through the IM context if we're a press
-    if (action == .press or action == .repeat) {
+    if (action == .press or action == .release or action == .repeat) {
         // This can trigger an input method so we need to notify the im context
         // where the cursor is so it can render the dropdowns in the correct
         // place.
