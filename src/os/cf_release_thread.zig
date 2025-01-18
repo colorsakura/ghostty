@@ -6,7 +6,7 @@ pub const Thread = @This();
 
 const std = @import("std");
 const builtin = @import("builtin");
-const xev = @import("xev");
+const xev = @import("xev").Epoll;
 const macos = @import("macos");
 
 const BlockingQueue = @import("../datastruct/main.zig").BlockingQueue;

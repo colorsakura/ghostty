@@ -9,7 +9,7 @@ const harfbuzz = @import("harfbuzz");
 const oni = @import("oniguruma");
 const crash = @import("crash/main.zig");
 const renderer = @import("renderer.zig");
-const xev = @import("xev");
+const xev = @import("xev").Epoll;
 
 /// Global process state. This is initialized in main() for exe artifacts
 /// and by ghostty_init() for lib artifacts. This should ONLY be used by
